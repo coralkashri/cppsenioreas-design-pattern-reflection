@@ -2,6 +2,9 @@
 #include <map>
 #include <typeindex>
 #include <variant>
+#include <vector>
+#include <chrono>
+#include <thread>
 
 #define PART 3
 
@@ -60,7 +63,8 @@ int main() {
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-struct my_class {
+class my_class {
+public:
     int i;
     float f;
     std::string s;
@@ -182,5 +186,108 @@ int main() {
     return EXIT_SUCCESS;
 }
 #elif PART == 3
+// helper type for the visitor
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
+struct struct_a {
+    int i;
+};
+
+struct struct_b {
+    std::string str;
+    double d;
+};
+
+struct struct_c {};
+struct struct_d {};
+
+class classes_collector {
+public:
+    using desired_class_variant = std::variant<struct_a, struct_b, struct_c, struct_d>;
+
+public:
+    classes_collector() {
+        available_vars_collection = {
+                {"struct_a", struct_a()},
+                {"struct_b", struct_b()},
+                {"struct_c", struct_c()},
+                {"struct_d", struct_d()},
+        };
+    }
+
+    [[nodiscard]] desired_class_variant get_class_by_name(const std::string &var_name) const {
+        return available_vars_collection.at(var_name);
+    }
+
+private:
+    std::map<std::string, desired_class_variant> available_vars_collection;
+};
+
+class class_types_collector {
+public:
+    class_types_collector() {
+        available_vars_collection = {
+                {"struct_a", typeid(struct_a)},
+                {"struct_b", typeid(struct_b)},
+                {"struct_c", typeid(struct_c)},
+                {"struct_d", typeid(struct_d)},
+        };
+    }
+
+    [[nodiscard]] std::type_index get_class_by_name(const std::string &var_name) const {
+        return available_vars_collection.at(var_name);
+    }
+
+private:
+    std::map<std::string, std::type_index> available_vars_collection;
+};
+
+int main() {
+    classes_collector classes;
+    classes_collector::desired_class_variant desired_class;
+
+    desired_class = classes.get_class_by_name("struct_a");
+    std::get<struct_a>(desired_class).i = 19;
+    std::visit(overloaded{
+            [](struct_a &s_a) { std::cout << s_a.i << "\n"; },
+            [](struct_b &s_b) { std::cout << s_b.str << " " << s_b.d << "\n"; },
+            [](auto another) {},
+    }, desired_class);
+
+    // Complex example
+    class_types_collector class_types;
+
+    struct available_data {
+        std::string struct_type;
+        void* struct_data;
+    };
+
+    available_data data;
+    data.struct_type = "struct_b";
+    data.struct_data = new struct_b {
+            .str = "Find Me!",
+            .d = 1465.165
+    };
+
+    auto desired_class_type = class_types.get_class_by_name(data.struct_type);
+
+    if (desired_class_type == typeid(struct_a)) {
+        auto data_parser = static_cast<struct_a *>(data.struct_data);
+        std::cout << data_parser->i << "\n";
+        delete data_parser;
+    } else if (desired_class_type == typeid(struct_b)) {
+        auto data_parser = static_cast<struct_b *>(data.struct_data);
+        std::cout << data_parser->str << " " << data_parser->d << "\n";
+        delete data_parser;
+    } else if (desired_class_type == typeid(struct_c)) {
+        auto data_parser = static_cast<struct_c *>(data.struct_data);
+        delete data_parser;
+    } else {
+        auto data_parser = static_cast<struct_d *>(data.struct_data);
+        delete data_parser;
+    }
+
+    return EXIT_SUCCESS;
+}
 #endif
