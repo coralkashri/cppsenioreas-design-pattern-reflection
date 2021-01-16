@@ -1,3 +1,13 @@
+/**
+ * All examples are taken from C++ Senioreas blog
+ * https://cppsenioreas.wordpress.com/
+ *
+ * Examples from:
+ * cpp_senioreas::design_pattern_runtime_reflection
+ * SOON
+ */
+
+
 #include <iostream>
 #include <map>
 #include <typeindex>
